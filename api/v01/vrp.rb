@@ -158,6 +158,27 @@ module Api
               end
               at_least_one_of :services, :shipments
 
+              optional(:relation, type: Hash, desc: '') do
+                optional(:sameroutes, type: Array, desc: '') do
+                  requires(:id, type: String, desc: '')
+                  requires(:service_ids, type: Array[String], desc: '')
+                end
+                optional(:orders, type: Array, desc: '') do
+                  requires(:id, type: String, desc: '')
+                  requires(:service_ids, type: Array[String], desc: '')
+                end
+                optional(:sequences, type: Array, desc: '') do
+                  requires(:id, type: String, desc: '')
+                  requires(:service_ids, type: Array[String], desc: '')
+                end
+                optional(:minimal_vehicle_lapses, type: Array, desc: '') do
+                  requires(:id, type: String, desc: '')
+                  requires(:service_ids, type: Array[String], desc: '')
+                  requires(:lapse, type: Float, desc: '')
+                end
+                at_least_one_of :sameroutes, :orders, :sequences, :minimal_vehicle_lapses
+              end
+
               optional(:configuration, type: Hash, desc: 'Describe the limitations of the solve in term of computation') do
                 optional(:preprocessing, type: Hash, desc: 'Parameters independant from the search') do
                   optional(:cluster_threshold, type: Float, desc: 'Regroup close points which constitute a cluster into a single geolocated point')
@@ -180,7 +201,7 @@ module Api
             begin
               File.write('test/fixtures/' + ENV['DUMP_VRP'].gsub(/[^a-z0-9\-]+/i, '_') + '.json', {vrp: params[:vrp]}.to_json) if ENV['DUMP_VRP']
               vrp = ::Models::Vrp.create({})
-              [:matrices, :units, :points, :rests, :vehicles, :services, :shipments, :configuration].each{ |key|
+              [:matrices, :units, :points, :rests, :vehicles, :services, :shipments, :relation, :configuration].each{ |key|
                 (vrp.send "#{key}=", params[:vrp][key]) if params[:vrp][key]
               }
               if !vrp.valid?

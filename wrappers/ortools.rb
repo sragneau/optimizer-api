@@ -40,6 +40,7 @@ module Wrappers
         :assert_services_at_most_two_timewindows,
         :assert_services_no_exclusion_cost,
         :assert_no_shipments,
+        :assert_no_relation
       ]
     end
 
@@ -73,7 +74,6 @@ module Wrappers
         mi = matrix_indices +
           (vehicle.start_point ? [points[vehicle.start_point_id].matrix_index] : [nil]) +
           (vehicle.end_point ? [points[vehicle.end_point_id].matrix_index] : [nil])
-
         matrix_time = vehicle.matrix_blend(mi, [:time])
         matrix_distance = vehicle.matrix_blend(mi, [:distance])
 

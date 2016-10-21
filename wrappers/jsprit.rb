@@ -45,7 +45,7 @@ module Wrappers
 
     def solve(vrp, job, &block)
       @job = job
-      result = run_jsprit(vrp.matrices[0].time, vrp.matrices[0].distance, vrp.vehicles, vrp.services, vrp.shipments, vrp.resolution_duration, vrp.resolution_iterations, vrp.resolution_iterations_without_improvment, vrp.resolution_stable_iterations, vrp.resolution_stable_coefficient, vrp.preprocessing_prefer_short_segment, @threads, &block)
+      result = run_jsprit(vrp.matrices[0].time, vrp.matrices[0].distance, vrp.vehicles, vrp.services, vrp.shipments, vrp.relation, vrp.resolution_duration, vrp.resolution_iterations, vrp.resolution_iterations_without_improvment, vrp.resolution_stable_iterations, vrp.resolution_stable_coefficient, vrp.preprocessing_prefer_short_segment, @threads, &block)
       if result && result.is_a?(Hash)
         vehicles = Hash[vrp.vehicles.collect{ |vehicle| [vehicle.id, vehicle] }]
         result
@@ -74,7 +74,7 @@ module Wrappers
       }.nil?
     end
 
-    def run_jsprit(matrix_time, matrix_distance, vehicles, services, shipments, resolution_duration, resolution_iterations, resolution_iterations_without_improvment, resolution_stable_iterations, resolution_stable_coefficient, nearby, threads, &block)
+    def run_jsprit(matrix_time, matrix_distance, vehicles, services, shipments, relation, resolution_duration, resolution_iterations, resolution_iterations_without_improvment, resolution_stable_iterations, resolution_stable_coefficient, nearby, threads, &block)
       fleet = Hash[vehicles.collect{ |vehicle| [vehicle.id, vehicle] }]
       builder = Nokogiri::XML::Builder.new(encoding: 'UTF-8') do |xml|
         xml.problem(xmlns: 'http://www.w3schools.com', ' xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance', 'xsi:schemaLocation' => 'http://www.w3schools.com vrp_xml_schema.xsd') {
@@ -275,9 +275,67 @@ module Wrappers
         }
       end
 
+      if relation
+        relation_builder = Nokogiri::XML::Builder.new(encoding: 'UTF-8') do |xml|
+          xml.relation(xmlns: 'http://www.w3schools.com', ' xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance', 'xsi:schemaLocation' => 'http://www.w3schools.com relation_xml_schema.xsd') {
+            if relation.sameroutes.size > 0
+              relation.sameroutes.each do |sameRoute|
+                xml.sameRouteRelations {
+                  xml.serviceIds {
+                    sameRoute.services.each do |service|
+                      xml.serviceId service.id
+                    end
+                  }
+                }
+              end
+            end
+            if relation.orders.size > 0
+              relation.orders.each do |order|
+                xml.orderRelations {
+                  xml.serviceIds {
+                    order.services.each do |service|
+                      xml.serviceId service.id
+                    end
+                  }
+                }
+              end
+            end
+            if relation.sequences.size > 0
+              relation.sequences.each do |sequence|
+                xml.sequenceRelations {
+                  xml.serviceIds {
+                    sequence.services.each do |service|
+                      xml.serviceId service.id
+                    end
+                  }
+                }
+              end
+            end
+            if relation.minimal_vehicle_lapses.size > 0
+              relation.minimal_vehicle_lapses.each do |minimal_vehicle_lapse|
+                xml.minimalVehicleLapseRelations {
+                  xml.lapse minimal_vehicle_lapse.lapse
+                  xml.serviceIds {
+                    minimal_vehicle_lapse.services.each do |service|
+                      xml.serviceId service.id
+                    end
+                  }
+                }
+              end
+            end
+          }
+        end
+      end
+
       input_problem = Tempfile.new('optimize-jsprit-input_problem', tmpdir=@tmp_dir)
       input_problem.write(builder.to_xml)
       input_problem.close
+
+      if relation
+        input_relation = Tempfile.new('optimize-jsprit-input_relation', tmpdir=@tmp_dir)
+        input_relation.write(relation_builder.to_xml)
+        input_relation.close
+      end
 
       input_algorithm = Tempfile.new('optimize-jsprit-input_algorithm', tmpdir=@tmp_dir)
       input_algorithm.write(algorithm_config(resolution_iterations))
@@ -301,6 +359,7 @@ module Wrappers
 
       cmd = ["#{@exec_jsprit} ",
         "--algorithm '#{input_algorithm.path}'",
+        input_relation ? "--relations '#{input_relation.path}'" : '',
         input_time_matrix ? "--time_matrix '#{input_time_matrix.path}'" : '',
         input_distance_matrix ? "--distance_matrix '#{input_distance_matrix.path}'" : '',
         resolution_duration ? "--ms '#{resolution_duration}'" : '',

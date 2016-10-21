@@ -164,6 +164,10 @@ module Wrappers
       })
     end
 
+    def assert_no_relation(vrp)
+      !vrp.relation
+    end
+
     def solve_synchronous?(vrp)
       false
     end
